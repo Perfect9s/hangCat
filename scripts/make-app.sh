@@ -76,7 +76,10 @@ cat > "$APP/Contents/Info.plist" <<EOF
 EOF
 
 echo "==> Ad-hoc code signing"
-codesign --force --deep --sign - "$APP"
+# Stable identifier so macOS recognizes successive rebuilds as the same app.
+# (TCC still tracks by cdhash, so users may need to re-grant AX after some
+# rebuilds — but this at least prevents an extra "rename to old path" prompt.)
+codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP"
 
 echo "==> Verifying"
 codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tail -5 || true

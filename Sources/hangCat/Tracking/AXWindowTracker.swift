@@ -19,7 +19,12 @@ final class AXWindowTracker {
 
     let pid: pid_t
     let appElement: AXUIElement
-    var onBindingChanged: ((WindowBinding?) -> Void)?
+    /// Re-emits the current binding when assigned, so callers that set this
+    /// after init still receive the initial value (otherwise the first
+    /// `publish()` from init runs before the closure is hooked up).
+    var onBindingChanged: ((WindowBinding?) -> Void)? {
+        didSet { publish() }
+    }
 
     private let mode: Mode
     private var observer: AXObserver?

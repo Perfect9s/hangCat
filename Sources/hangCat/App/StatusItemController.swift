@@ -6,7 +6,10 @@ final class StatusItemController {
 
     private var sizeMenuItems: [NSMenuItem] = []
     private var modeMenuItems: [NSMenuItem] = []
+    private var permissionItem: NSMenuItem!
+
     private var modeChangeToken: NSObjectProtocol?
+    private var permissionTimer: Timer?
 
     init(bindingManager: BindingManager) {
         self.bindingManager = bindingManager
@@ -17,6 +20,16 @@ final class StatusItemController {
         }
 
         let menu = NSMenu()
+
+        // ---- Permission status (only visible when AX is denied) ----
+        permissionItem = NSMenuItem(
+            title: "❗未获得辅助功能权限 — 点击打开设置",
+            action: #selector(openAccessibilitySettings),
+            keyEquivalent: ""
+        )
+        permissionItem.target = self
+        permissionItem.isHidden = true
+        menu.addItem(permissionItem)
 
         // ---- Binding mode submenu ----
         let modeHeader = NSMenuItem(title: "绑定模式", action: nil, keyEquivalent: "")
@@ -61,16 +74,26 @@ final class StatusItemController {
         item.menu = menu
 
         refreshChecks()
+        refreshPermissionState()
 
         modeChangeToken = NotificationCenter.default.addObserver(
             forName: .catBindingModeChanged, object: nil, queue: .main
         ) { [weak self] _ in
             self?.refreshChecks()
         }
+
+        // Poll the AX trust state once a second so the indicator clears
+        // promptly after the user toggles the switch in System Settings.
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.refreshPermissionState()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        permissionTimer = timer
     }
 
     deinit {
         if let t = modeChangeToken { NotificationCenter.default.removeObserver(t) }
+        permissionTimer?.invalidate()
     }
 
     // MARK: - Actions
@@ -87,7 +110,6 @@ final class StatusItemController {
         case .frontmost:
             Settings.shared.bindingMode = .frontmost
         case .pinned:
-            // Capture the current frontmost window and pin to it.
             if let bm = bindingManager, !bm.pinCurrent() {
                 let alert = NSAlert()
                 alert.messageText = "暂时没法钉住"
@@ -96,7 +118,11 @@ final class StatusItemController {
                 alert.runModal()
             }
         }
-        // Note: the mode-changed notification will trigger refreshChecks().
+    }
+
+    @objc private func openAccessibilitySettings() {
+        AccessibilityGate.requestTrust()
+        AccessibilityGate.openSystemSettings()
     }
 
     @objc private func quit() {
@@ -114,5 +140,13 @@ final class StatusItemController {
         for mi in modeMenuItems {
             mi.state = (mi.tag == currentMode.rawValue) ? .on : .off
         }
+    }
+
+    private func refreshPermissionState() {
+        let trusted = AccessibilityGate.isTrusted
+        // Sad cat in the menu bar makes "the cat isn't where I expect" obvious.
+        item.button?.title = trusted ? "🐱" : "😿"
+        item.button?.toolTip = trusted ? "hangCat" : "hangCat — 等待辅助功能授权"
+        permissionItem.isHidden = trusted
     }
 }
