@@ -41,6 +41,19 @@ open hangCat.app
 
 Requires Swift 5.9+ and macOS 14+. No third-party dependencies.
 
+### One-shot release
+
+For maintainers cutting a new version:
+
+```sh
+./scripts/release.sh 0.2.0 "fix cat sometimes not appearing"
+```
+
+Builds the universal `.app`, commits any pending changes, tags `v0.2.0`,
+pushes, and (if `gh` is installed) creates/updates the GitHub release with
+`build/hangCat.app.zip` attached. If `gh` isn't installed, prints a
+one-click URL to finish the upload in the browser.
+
 ## How it works
 
 | Concern | Approach |
